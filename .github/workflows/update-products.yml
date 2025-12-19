@@ -66,11 +66,13 @@ jobs:
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
           
-          # Check if there are changes to commit
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to commit"
+          # Always add the file
+          git add public/products.json
+          
+          # Check if there are actual changes in content
+          if git diff --cached --quiet; then
+            echo "No actual changes in content"
           else
-            git add public/products.json
             git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
             git push
             echo "Changes committed and pushed"
