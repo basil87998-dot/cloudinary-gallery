@@ -16,6 +16,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          # This ensures we have the complete history
+          fetch-depth: 0
+
+      - name: Create public directory
+        run: |
+          # Create the public directory if it doesn't exist
+          mkdir -p public
 
       - name: Fetch from Cloudinary API
         env:
@@ -31,16 +39,39 @@ jobs:
             "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/search")
           
           # Save the response as a JSON file
-          echo $RESPONSE > public/products.json
+          echo "$RESPONSE" > public/products.json
           
-          # Print a preview
-          echo "Data fetched successfully. First product:"
-          echo $RESPONSE | jq -r '.resources[0].context.custom // "No context"'
+          # Print a preview (install jq first)
+          echo "Data fetched successfully. Found $(echo $RESPONSE | jq '.resources | length') products."
+
+      - name: Check if jq is installed
+        run: |
+          if ! command -v jq &> /dev/null; then
+            echo "jq not found, installing..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+      - name: Show data preview
+        run: |
+          if [ -f "public/products.json" ]; then
+            echo "First product preview:"
+            jq -r '.resources[0] | {public_id, secure_url, context}' public/products.json
+          else
+            echo "ERROR: products.json was not created!"
+            exit 1
+          fi
 
       - name: Commit and push changes
         run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          git add public/products.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update product data [$(date)]"
-          git push
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "github-action-bot@users.noreply.github.com"
+          
+          # Check if there are changes to commit
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git add public/products.json
+            git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
+            git push
+            echo "Changes committed and pushed"
+          fi
