@@ -1,0 +1,46 @@
+name: Update Product Data
+
+on:
+  schedule:
+    # Runs every 12 hours (at minute 0 of hour 0 and 12)
+    - cron: '0 */12 * * *'
+  # Also runs when you manually trigger it
+  workflow_dispatch:
+  # Runs when you push to the main branch
+  push:
+    branches: [ main ]
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Fetch from Cloudinary API
+        env:
+          CLOUDINARY_CLOUD_NAME: 'pearlmart'
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+        run: |
+          # Use curl to call the Cloudinary API
+          RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -u "${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}" \
+            -d '{"expression":"folder:products-admin","with_field":["context"],"max_results":30}' \
+            "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/search")
+          
+          # Save the response as a JSON file
+          echo $RESPONSE > public/products.json
+          
+          # Print a preview
+          echo "Data fetched successfully. First product:"
+          echo $RESPONSE | jq -r '.resources[0].context.custom // "No context"'
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add public/products.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update product data [$(date)]"
+          git push
