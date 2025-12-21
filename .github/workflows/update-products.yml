@@ -4,11 +4,7 @@ on:
   schedule:
     # Runs every 12 hours (at minute 0 of hour 0 and 12)
     - cron: '0 */12 * * *'
-  # Also runs when you manually trigger it
   workflow_dispatch:
-  # Runs when you push to the main branch
-  push:
-    branches: [ main ]
 
 jobs:
   update-data:
@@ -17,14 +13,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          # This ensures we have the complete history
           fetch-depth: 0
-          # Use --force option to allow overwriting
-          ref: main
 
       - name: Create public directory
         run: |
-          # Create the public directory if it doesn't exist
           mkdir -p public
 
       - name: Fetch from Cloudinary API
@@ -33,23 +25,18 @@ jobs:
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
         run: |
-          # Use curl to call the Cloudinary API
           RESPONSE=$(curl -s -X POST \
             -H "Content-Type: application/json" \
             -u "${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}" \
             -d '{"expression":"folder:products-admin","with_field":["context"],"max_results":30}' \
             "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/search")
           
-          # Save the response as a JSON file
           echo "$RESPONSE" > public/products.json
-          
-          # Print a preview (install jq first)
           echo "Data fetched successfully. Found $(echo $RESPONSE | jq '.resources | length') products."
 
-      - name: Check if jq is installed
+      - name: Install jq if needed
         run: |
           if ! command -v jq &> /dev/null; then
-            echo "jq not found, installing..."
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
@@ -63,21 +50,25 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push changes
+      - name: Configure Git
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
+
+      - name: Commit and push
+        run: |
+          # Reset to remote main to avoid conflicts
+          git fetch origin
+          git reset --hard origin/main
           
-          # Always add the file
+          # Add and commit the updated file
           git add public/products.json
           
-          # Check if there are actual changes in content
-          if git diff --cached --quiet; then
-            echo "No actual changes in content"
-          else
-            # Force update to avoid conflicts
-            git pull --rebase origin main || echo "Local changes, proceeding with commit"
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
             git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
-            git push --force
+            git push origin main
             echo "Changes committed and pushed"
+          else
+            echo "No changes to commit"
           fi
