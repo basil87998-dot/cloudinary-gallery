@@ -19,6 +19,8 @@ jobs:
         with:
           # This ensures we have the complete history
           fetch-depth: 0
+          # Add token for authentication
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create public directory
         run: |
@@ -61,19 +63,30 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push changes
+      - name: Configure Git
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
-          
+          # Set up the remote URL with token
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Commit and push changes
+        run: |
           # Always add the file
           git add public/products.json
           
           # Check if there are actual changes in content
           if git diff --cached --quiet; then
             echo "No actual changes in content"
-          else
-            git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
-            git push
-            echo "Changes committed and pushed"
+            exit 0
           fi
+          
+          # Pull latest changes and rebase
+          git pull origin main --rebase --autostash
+          
+          # Commit changes
+          git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
+          
+          # Push changes
+          git push origin main
+          echo "Changes committed and pushed"
