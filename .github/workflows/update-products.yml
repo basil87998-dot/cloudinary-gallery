@@ -44,17 +44,18 @@ jobs:
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
-      - name: Generate products.json with ALWAYS unique content
+      - name: Generate products.json with unique metadata
         run: |
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           PRETTY_TIME=$(date +"%Y-%m-%d %H:%M:%S UTC")
-          RANDOM_ID=$(openssl rand -hex 4)
+          RANDOM_ID=$(openssl rand -hex 8)
           COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          RUN_ID="${{ github.run_id }}-${{ github.run_attempt }}"
           
-          echo "Generating products.json with:"
-          echo "  Timestamp: $TIMESTAMP"
-          echo "  Random ID: $RANDOM_ID"
-          echo "  Commit: $COMMIT_HASH"
+          echo "Generating products.json with unique metadata..."
+          echo "Timestamp: $TIMESTAMP"
+          echo "Random ID: $RANDOM_ID"
+          echo "Run ID: $RUN_ID"
           
           if [ -f "public/products_raw.json" ]; then
             # Create products.json with ALWAYS unique metadata
@@ -62,6 +63,7 @@ jobs:
                --arg ptime "$PRETTY_TIME" \
                --arg rid "$RANDOM_ID" \
                --arg hash "$COMMIT_HASH" \
+               --arg run "$RUN_ID" \
                --argjson count $(jq '.resources | length' public/products_raw.json) \
                '. + {
                   metadata: {
@@ -72,12 +74,13 @@ jobs:
                     update_type: "scheduled",
                     update_id: $rid,
                     git_commit: $hash,
-                    workflow_run: "'${{ github.run_id }}'",
-                    run_attempt: "'${{ github.run_attempt }}'"
+                    workflow_run: $run,
+                    generated_at: "'$(date +%s)'"
                   }
                 }' public/products_raw.json > public/products.json
             
-            echo "✅ Generated products.json with unique update_id: $RANDOM_ID"
+            echo "✅ Generated products.json with update_id: $RANDOM_ID"
+            echo "File size: $(wc -c < public/products.json) bytes"
           else
             echo "ERROR: products_raw.json was not created!"
             exit 1
@@ -101,81 +104,70 @@ jobs:
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
 
-      - name: Force update with ALWAYS new content
+      - name: Update and commit changes
         run: |
-          # First, delete the existing file from Git's index
-          echo "Step 1: Removing existing file from Git index..."
-          git rm --cached public/products.json 2>/dev/null || true
+          # Pull latest changes first
+          echo "Step 1: Pulling latest changes..."
+          git pull origin main
           
-          # Pull latest changes
-          echo "Step 2: Pulling latest changes..."
-          git pull origin main --rebase --autostash || echo "Pull may have conflicts, continuing..."
-          
-          # Delete any existing products.json
-          echo "Step 3: Deleting existing file..."
-          rm -f public/products.json public/products.json.bak 2>/dev/null || true
-          
-          # Now move our newly generated file into place
-          echo "Step 4: Moving new file into place..."
+          # Check if file exists and get its current state
+          echo "Step 2: Checking current state..."
           if [ -f "public/products.json" ]; then
-            echo "File already exists, comparing..."
-            OLD_HASH=$(git hash-object public/products.json 2>/dev/null || echo "none")
-            NEW_HASH=$(git hash-object public/products_raw_processed.json 2>/dev/null || echo "none")
-            echo "Old hash: $OLD_HASH"
-            echo "New hash: $NEW_HASH"
+            OLD_UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json 2>/dev/null || echo "none")
+            echo "Current file update_id: $OLD_UPDATE_ID"
+          else
+            echo "No existing products.json found"
           fi
           
-          # Add the new file
-          echo "Step 5: Adding new file to Git..."
-          git add -f public/products.json
+          # Get the new update_id from our generated file
+          NEW_UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json 2>/dev/null || echo "unknown")
+          echo "New file update_id: $NEW_UPDATE_ID"
           
-          # Check for actual changes using git diff
-          echo "Step 6: Checking for changes..."
-          if ! git diff --cached --name-only | grep -q "public/products.json"; then
-            echo "⚠️ Git doesn't see changes in the file"
-            echo "Forcing a change by adding a comment..."
-            # Add a unique comment to the file
-            UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json)
-            echo "// Auto-generated at $(date) - Update ID: $UPDATE_ID" > public/products.comment
-            cat public/products.comment public/products.json > public/products.json.tmp
-            mv public/products.json.tmp public/products.json
-            git add -f public/products.json
+          # Always add and commit the file (it's always unique due to random ID)
+          echo "Step 3: Adding file to Git..."
+          git add public/products.json
+          
+          # Check if there are actual changes
+          echo "Step 4: Checking for changes..."
+          if git diff --cached --quiet; then
+            echo "⚠️ No changes detected by git diff, but we'll commit anyway..."
+            # Force a change by modifying the file slightly
+            echo "// This ensures a unique commit - Update ID: $NEW_UPDATE_ID" >> public/products.json
+            git add public/products.json
           fi
           
-          # Always commit (even if Git doesn't see changes)
-          echo "Step 7: Committing changes..."
+          # Commit with detailed message
+          echo "Step 5: Committing..."
           COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
-          UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json 2>/dev/null || echo "manual-$(date +%s)")
           PRODUCT_COUNT=$(jq '.resources | length' public/products.json 2>/dev/null || echo "0")
           
-          git commit -m "🔄 Update product data [$COMMIT_TIME]" \
-                     -m "Update ID: $UPDATE_ID" \
-                     -m "Products: $PRODUCT_COUNT items" \
-                     -m "Workflow: ${{ github.workflow }} #${{ github.run_number }}" \
-                     --allow-empty
+          git commit -m "📦 Update product data [$COMMIT_TIME]" \
+                     -m "Update ID: $NEW_UPDATE_ID" \
+                     -m "Total products: $PRODUCT_COUNT" \
+                     -m "Workflow run: ${{ github.run_number }}"
           
-          echo "Step 8: Pushing changes..."
+          echo "Step 6: Pushing changes..."
           git push origin main
           
-          echo "✅ Successfully updated at $COMMIT_TIME"
-          echo "📊 Update ID: $UPDATE_ID"
-          echo "📦 Products: $PRODUCT_COUNT"
+          echo "✅ Successfully updated!"
+          echo "🕐 Time: $COMMIT_TIME"
+          echo "🆔 Update ID: $NEW_UPDATE_ID"
+          echo "📊 Products: $PRODUCT_COUNT"
 
-      - name: Clean up temporary files
+      - name: Clean up
         run: |
-          rm -f public/products_raw.json public/products.comment 2>/dev/null || true
-          echo "Cleanup complete"
+          rm -f public/products_raw.json 2>/dev/null || true
+          echo "Cleanup done"
 
       - name: Final verification
         run: |
           echo "=== FINAL VERIFICATION ==="
-          echo "Current UTC time: $(date -u +"%Y-%m-%d %H:%M:%S")"
-          echo ""
-          echo "File info:"
+          echo "File status:"
           ls -la public/products.json
           echo ""
-          echo "Metadata from file:"
-          jq -r '.metadata | "Last Updated: \(.last_updated_human)\nUpdate ID: \(.update_id)\nProducts: \(.total_products)"' public/products.json
+          echo "Current time: $(date)"
+          echo "File metadata:"
+          jq -r '.metadata | "Last updated: \(.last_updated_human)\nUpdate ID: \(.update_id)\nWorkflow run: \(.workflow_run)"' public/products.json
           echo ""
           echo "Latest commit:"
-          git log --oneline -1
+          git log --oneline -3
