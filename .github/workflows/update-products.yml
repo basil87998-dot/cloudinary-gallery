@@ -31,12 +31,12 @@ jobs:
             -d '{"expression":"folder:products-admin","with_field":["context"],"max_results":30}' \
             "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/search")
           
-          # Save raw response
-          echo "$RESPONSE" > public/products_raw.json
-          
           # Count products
           PRODUCT_COUNT=$(echo "$RESPONSE" | jq '.resources | length')
           echo "Data fetched successfully. Found $PRODUCT_COUNT products."
+          
+          # Save raw response
+          echo "$RESPONSE" > public/products_raw.json
 
       - name: Install jq if needed
         run: |
@@ -44,15 +44,24 @@ jobs:
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
-      - name: Add timestamp and metadata to products.json
+      - name: Generate products.json with ALWAYS unique content
         run: |
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           PRETTY_TIME=$(date +"%Y-%m-%d %H:%M:%S UTC")
+          RANDOM_ID=$(openssl rand -hex 4)
+          COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          
+          echo "Generating products.json with:"
+          echo "  Timestamp: $TIMESTAMP"
+          echo "  Random ID: $RANDOM_ID"
+          echo "  Commit: $COMMIT_HASH"
           
           if [ -f "public/products_raw.json" ]; then
-            # Add comprehensive metadata
+            # Create products.json with ALWAYS unique metadata
             jq --arg ts "$TIMESTAMP" \
                --arg ptime "$PRETTY_TIME" \
+               --arg rid "$RANDOM_ID" \
+               --arg hash "$COMMIT_HASH" \
                --argjson count $(jq '.resources | length' public/products_raw.json) \
                '. + {
                   metadata: {
@@ -60,12 +69,15 @@ jobs:
                     last_updated_human: $ptime,
                     total_products: $count,
                     source: "Cloudinary API",
-                    update_type: "scheduled"
+                    update_type: "scheduled",
+                    update_id: $rid,
+                    git_commit: $hash,
+                    workflow_run: "'${{ github.run_id }}'",
+                    run_attempt: "'${{ github.run_attempt }}'"
                   }
                 }' public/products_raw.json > public/products.json
             
-            echo "Added timestamp: $TIMESTAMP"
-            echo "Total products: $(jq '.resources | length' public/products.json)"
+            echo "✅ Generated products.json with unique update_id: $RANDOM_ID"
           else
             echo "ERROR: products_raw.json was not created!"
             exit 1
@@ -78,8 +90,7 @@ jobs:
             echo "Metadata:"
             jq -r '.metadata' public/products.json
             echo ""
-            echo "First product:"
-            jq -r '.resources[0] | {public_id, secure_url, context}' public/products.json
+            echo "Total products: $(jq '.resources | length' public/products.json)"
           else
             echo "ERROR: products.json was not created!"
             exit 1
@@ -90,54 +101,81 @@ jobs:
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
 
-      - name: Force delete old file and commit changes
+      - name: Force update with ALWAYS new content
         run: |
-          # Pull latest changes to avoid conflicts
-          git pull origin main --rebase --autostash || echo "Pull failed, continuing..."
+          # First, delete the existing file from Git's index
+          echo "Step 1: Removing existing file from Git index..."
+          git rm --cached public/products.json 2>/dev/null || true
           
-          # Remove the old file completely (forces Git to see it as changed)
-          rm -f public/products.json
+          # Pull latest changes
+          echo "Step 2: Pulling latest changes..."
+          git pull origin main --rebase --autostash || echo "Pull may have conflicts, continuing..."
           
-          # Recreate it (ensures fresh inode/timestamp)
-          cp public/products_raw.json public/products.json
-          rm -f public/products_raw.json
+          # Delete any existing products.json
+          echo "Step 3: Deleting existing file..."
+          rm -f public/products.json public/products.json.bak 2>/dev/null || true
           
-          # Stage changes
+          # Now move our newly generated file into place
+          echo "Step 4: Moving new file into place..."
+          if [ -f "public/products.json" ]; then
+            echo "File already exists, comparing..."
+            OLD_HASH=$(git hash-object public/products.json 2>/dev/null || echo "none")
+            NEW_HASH=$(git hash-object public/products_raw_processed.json 2>/dev/null || echo "none")
+            echo "Old hash: $OLD_HASH"
+            echo "New hash: $NEW_HASH"
+          fi
+          
+          # Add the new file
+          echo "Step 5: Adding new file to Git..."
           git add -f public/products.json
           
-          # Check if there are changes
-          if git status --porcelain | grep -q "public/products.json"; then
-            echo "File has changes, committing..."
-            COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
-            git commit -m "🔄 Update product data [$COMMIT_TIME]" \
-                       -m "Auto-update from Cloudinary API" \
-                       -m "Total products: $(jq '.resources | length' public/products.json)"
-            
-            # Force push to ensure update
-            git push origin main --force-with-lease
-            echo "✅ Changes force-pushed successfully at $COMMIT_TIME"
-          else
-            echo "⚠️ No changes detected in products.json"
-            
-            # Force an empty commit to update timestamp anyway
-            COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
-            git commit --allow-empty \
-                       -m "⏱️ Product data timestamp refresh [$COMMIT_TIME]" \
-                       -m "No data changes, updating timestamp only"
-            git push origin main
-            echo "📅 Empty commit pushed to update timestamp at $COMMIT_TIME"
+          # Check for actual changes using git diff
+          echo "Step 6: Checking for changes..."
+          if ! git diff --cached --name-only | grep -q "public/products.json"; then
+            echo "⚠️ Git doesn't see changes in the file"
+            echo "Forcing a change by adding a comment..."
+            # Add a unique comment to the file
+            UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json)
+            echo "// Auto-generated at $(date) - Update ID: $UPDATE_ID" > public/products.comment
+            cat public/products.comment public/products.json > public/products.json.tmp
+            mv public/products.json.tmp public/products.json
+            git add -f public/products.json
           fi
+          
+          # Always commit (even if Git doesn't see changes)
+          echo "Step 7: Committing changes..."
+          COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
+          UPDATE_ID=$(jq -r '.metadata.update_id' public/products.json 2>/dev/null || echo "manual-$(date +%s)")
+          PRODUCT_COUNT=$(jq '.resources | length' public/products.json 2>/dev/null || echo "0")
+          
+          git commit -m "🔄 Update product data [$COMMIT_TIME]" \
+                     -m "Update ID: $UPDATE_ID" \
+                     -m "Products: $PRODUCT_COUNT items" \
+                     -m "Workflow: ${{ github.workflow }} #${{ github.run_number }}" \
+                     --allow-empty
+          
+          echo "Step 8: Pushing changes..."
+          git push origin main
+          
+          echo "✅ Successfully updated at $COMMIT_TIME"
+          echo "📊 Update ID: $UPDATE_ID"
+          echo "📦 Products: $PRODUCT_COUNT"
 
       - name: Clean up temporary files
         run: |
-          rm -f public/products_raw.json 2>/dev/null || true
+          rm -f public/products_raw.json public/products.comment 2>/dev/null || true
           echo "Cleanup complete"
 
-      - name: Verify final state
+      - name: Final verification
         run: |
-          echo "=== Final Verification ==="
-          echo "File exists: $(ls -la public/products.json 2>/dev/null && echo 'Yes' || echo 'No')"
-          echo "File size: $(stat -c%s public/products.json 2>/dev/null || echo '0') bytes"
-          echo "Timestamp in file:"
-          jq -r '.metadata.last_updated_human' public/products.json 2>/dev/null || echo "Not found"
-          echo "Current time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "=== FINAL VERIFICATION ==="
+          echo "Current UTC time: $(date -u +"%Y-%m-%d %H:%M:%S")"
+          echo ""
+          echo "File info:"
+          ls -la public/products.json
+          echo ""
+          echo "Metadata from file:"
+          jq -r '.metadata | "Last Updated: \(.last_updated_human)\nUpdate ID: \(.update_id)\nProducts: \(.total_products)"' public/products.json
+          echo ""
+          echo "Latest commit:"
+          git log --oneline -1
