@@ -5,7 +5,7 @@ on:
     # Runs every 12 hours (at minute 0 of hour 0 and 12)
     - cron: '0 */12 * * *'
   workflow_dispatch:
- 
+
 jobs:
   update-data:
     runs-on: ubuntu-latest
@@ -31,8 +31,12 @@ jobs:
             -d '{"expression":"folder:products-admin","with_field":["context"],"max_results":30}' \
             "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/search")
           
-          echo "$RESPONSE" > public/products.json
-          echo "Data fetched successfully. Found $(echo $RESPONSE | jq '.resources | length') products."
+          # Save raw response
+          echo "$RESPONSE" > public/products_raw.json
+          
+          # Count products
+          PRODUCT_COUNT=$(echo "$RESPONSE" | jq '.resources | length')
+          echo "Data fetched successfully. Found $PRODUCT_COUNT products."
 
       - name: Install jq if needed
         run: |
@@ -40,10 +44,41 @@ jobs:
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
+      - name: Add timestamp and metadata to products.json
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          PRETTY_TIME=$(date +"%Y-%m-%d %H:%M:%S UTC")
+          
+          if [ -f "public/products_raw.json" ]; then
+            # Add comprehensive metadata
+            jq --arg ts "$TIMESTAMP" \
+               --arg ptime "$PRETTY_TIME" \
+               --argjson count $(jq '.resources | length' public/products_raw.json) \
+               '. + {
+                  metadata: {
+                    last_updated: $ts,
+                    last_updated_human: $ptime,
+                    total_products: $count,
+                    source: "Cloudinary API",
+                    update_type: "scheduled"
+                  }
+                }' public/products_raw.json > public/products.json
+            
+            echo "Added timestamp: $TIMESTAMP"
+            echo "Total products: $(jq '.resources | length' public/products.json)"
+          else
+            echo "ERROR: products_raw.json was not created!"
+            exit 1
+          fi
+
       - name: Show data preview
         run: |
           if [ -f "public/products.json" ]; then
-            echo "First product preview:"
+            echo "=== Data Preview ==="
+            echo "Metadata:"
+            jq -r '.metadata' public/products.json
+            echo ""
+            echo "First product:"
             jq -r '.resources[0] | {public_id, secure_url, context}' public/products.json
           else
             echo "ERROR: products.json was not created!"
@@ -55,20 +90,54 @@ jobs:
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "github-action-bot@users.noreply.github.com"
 
-      - name: Commit and push
+      - name: Force delete old file and commit changes
         run: |
-          # Reset to remote main to avoid conflicts
-          git fetch origin
-          git reset --hard origin/main
+          # Pull latest changes to avoid conflicts
+          git pull origin main --rebase --autostash || echo "Pull failed, continuing..."
           
-          # Add and commit the updated file
-          git add public/products.json
+          # Remove the old file completely (forces Git to see it as changed)
+          rm -f public/products.json
           
-          # Only commit if there are changes
-          if ! git diff --cached --quiet; then
-            git commit -m "Update product data [$(date +'%Y-%m-%d %H:%M:%S')]"
-            git push origin main
-            echo "Changes committed and pushed"
+          # Recreate it (ensures fresh inode/timestamp)
+          cp public/products_raw.json public/products.json
+          rm -f public/products_raw.json
+          
+          # Stage changes
+          git add -f public/products.json
+          
+          # Check if there are changes
+          if git status --porcelain | grep -q "public/products.json"; then
+            echo "File has changes, committing..."
+            COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
+            git commit -m "🔄 Update product data [$COMMIT_TIME]" \
+                       -m "Auto-update from Cloudinary API" \
+                       -m "Total products: $(jq '.resources | length' public/products.json)"
+            
+            # Force push to ensure update
+            git push origin main --force-with-lease
+            echo "✅ Changes force-pushed successfully at $COMMIT_TIME"
           else
-            echo "No changes to commit"
+            echo "⚠️ No changes detected in products.json"
+            
+            # Force an empty commit to update timestamp anyway
+            COMMIT_TIME=$(date +"%Y-%m-%d %H:%M:%S")
+            git commit --allow-empty \
+                       -m "⏱️ Product data timestamp refresh [$COMMIT_TIME]" \
+                       -m "No data changes, updating timestamp only"
+            git push origin main
+            echo "📅 Empty commit pushed to update timestamp at $COMMIT_TIME"
           fi
+
+      - name: Clean up temporary files
+        run: |
+          rm -f public/products_raw.json 2>/dev/null || true
+          echo "Cleanup complete"
+
+      - name: Verify final state
+        run: |
+          echo "=== Final Verification ==="
+          echo "File exists: $(ls -la public/products.json 2>/dev/null && echo 'Yes' || echo 'No')"
+          echo "File size: $(stat -c%s public/products.json 2>/dev/null || echo '0') bytes"
+          echo "Timestamp in file:"
+          jq -r '.metadata.last_updated_human' public/products.json 2>/dev/null || echo "Not found"
+          echo "Current time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
