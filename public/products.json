@@ -1,7 +1,39 @@
 {
-  "total_count": 9,
-  "time": 7560,
+  "total_count": 10,
+  "time": 1313,
   "resources": [
+    {
+      "asset_id": "12cdb10747f999671bc3b05520e56235",
+      "public_id": "products-admin/pfqgameksumdqn4jkfsj",
+      "folder": "products-admin",
+      "filename": "pfqgameksumdqn4jkfsj",
+      "format": "jpg",
+      "version": 1766488281,
+      "resource_type": "image",
+      "type": "upload",
+      "created_at": "2025-12-23T11:11:21+00:00",
+      "uploaded_at": "2025-12-23T11:11:21+00:00",
+      "bytes": 439456,
+      "backup_bytes": 0,
+      "width": 718,
+      "height": 1015,
+      "aspect_ratio": 0.70739,
+      "pixels": 728770,
+      "context": {
+        "category": "accessories",
+        "description": "we good",
+        "name": "Latikitokop",
+        "price": "7000"
+      },
+      "url": "http://res.cloudinary.com/pearlmart/image/upload/v1766488281/products-admin/pfqgameksumdqn4jkfsj.jpg",
+      "secure_url": "https://res.cloudinary.com/pearlmart/image/upload/v1766488281/products-admin/pfqgameksumdqn4jkfsj.jpg",
+      "status": "active",
+      "access_mode": "public",
+      "access_control": null,
+      "etag": "e001986622ce447d01cb2e39e20e5770",
+      "created_by": null,
+      "uploaded_by": null
+    },
     {
       "asset_id": "f4febc8951e697b9e01a35538f5c1e8f",
       "public_id": "products-admin/ydwtvak4avj4mvol6bli",
@@ -291,14 +323,14 @@
     }
   ],
   "metadata": {
-    "last_updated": "2025-12-23T03:53:36Z",
-    "last_updated_human": "2025-12-23 03:53:36 UTC",
-    "total_products": 9,
+    "last_updated": "2025-12-23T11:11:56Z",
+    "last_updated_human": "2025-12-23 11:11:56 UTC",
+    "total_products": 10,
     "source": "Cloudinary API",
     "update_type": "scheduled",
-    "update_id": "323b295200c7a458",
-    "git_commit": "e319c33",
-    "workflow_run": "20450825770-1",
-    "generated_at": "1766462016"
+    "update_id": "ffa261477a7b1b18",
+    "git_commit": "e023881",
+    "workflow_run": "20459155717-1",
+    "generated_at": "1766488316"
   }
 }
