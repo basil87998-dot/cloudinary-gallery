@@ -1,7 +1,39 @@
 {
-  "total_count": 8,
-  "time": 701,
+  "total_count": 9,
+  "time": 7560,
   "resources": [
+    {
+      "asset_id": "f4febc8951e697b9e01a35538f5c1e8f",
+      "public_id": "products-admin/ydwtvak4avj4mvol6bli",
+      "folder": "products-admin",
+      "filename": "ydwtvak4avj4mvol6bli",
+      "format": "jpg",
+      "version": 1766411248,
+      "resource_type": "image",
+      "type": "upload",
+      "created_at": "2025-12-22T13:47:28+00:00",
+      "uploaded_at": "2025-12-22T13:47:28+00:00",
+      "bytes": 16455,
+      "backup_bytes": 0,
+      "width": 236,
+      "height": 354,
+      "aspect_ratio": 0.66667,
+      "pixels": 83544,
+      "context": {
+        "category": "desktops",
+        "description": "juju tia",
+        "name": "kilool",
+        "price": "20000"
+      },
+      "url": "http://res.cloudinary.com/pearlmart/image/upload/v1766411248/products-admin/ydwtvak4avj4mvol6bli.jpg",
+      "secure_url": "https://res.cloudinary.com/pearlmart/image/upload/v1766411248/products-admin/ydwtvak4avj4mvol6bli.jpg",
+      "status": "active",
+      "access_mode": "public",
+      "access_control": null,
+      "etag": "ee38fed3ca525582d32327a06f77c723",
+      "created_by": null,
+      "uploaded_by": null
+    },
     {
       "asset_id": "9545a113958e67b422af2b0e2f441e02",
       "public_id": "products-admin/chloy3wlflwyso2kcp80",
@@ -259,14 +291,14 @@
     }
   ],
   "metadata": {
-    "last_updated": "2025-12-22T13:47:25Z",
-    "last_updated_human": "2025-12-22 13:47:25 UTC",
-    "total_products": 8,
+    "last_updated": "2025-12-23T03:53:36Z",
+    "last_updated_human": "2025-12-23 03:53:36 UTC",
+    "total_products": 9,
     "source": "Cloudinary API",
     "update_type": "scheduled",
-    "update_id": "bcfef7bdb0513458",
-    "git_commit": "249f211",
-    "workflow_run": "20433713412-1",
-    "generated_at": "1766411245"
+    "update_id": "323b295200c7a458",
+    "git_commit": "e319c33",
+    "workflow_run": "20450825770-1",
+    "generated_at": "1766462016"
   }
 }
