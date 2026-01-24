@@ -1,6 +1,6 @@
 {
-  "total_count": 10,
-  "time": 4643,
+  "total_count": 9,
+  "time": 7088,
   "resources": [
     {
       "asset_id": "12cdb10747f999671bc3b05520e56235",
@@ -31,38 +31,6 @@
       "access_mode": "public",
       "access_control": null,
       "etag": "e001986622ce447d01cb2e39e20e5770",
-      "created_by": null,
-      "uploaded_by": null
-    },
-    {
-      "asset_id": "f4febc8951e697b9e01a35538f5c1e8f",
-      "public_id": "products-admin/ydwtvak4avj4mvol6bli",
-      "folder": "products-admin",
-      "filename": "ydwtvak4avj4mvol6bli",
-      "format": "jpg",
-      "version": 1766411248,
-      "resource_type": "image",
-      "type": "upload",
-      "created_at": "2025-12-22T13:47:28+00:00",
-      "uploaded_at": "2025-12-22T13:47:28+00:00",
-      "bytes": 16455,
-      "backup_bytes": 0,
-      "width": 236,
-      "height": 354,
-      "aspect_ratio": 0.66667,
-      "pixels": 83544,
-      "context": {
-        "category": "desktops",
-        "description": "juju tia",
-        "name": "kilool",
-        "price": "20000"
-      },
-      "url": "http://res.cloudinary.com/pearlmart/image/upload/v1766411248/products-admin/ydwtvak4avj4mvol6bli.jpg",
-      "secure_url": "https://res.cloudinary.com/pearlmart/image/upload/v1766411248/products-admin/ydwtvak4avj4mvol6bli.jpg",
-      "status": "active",
-      "access_mode": "public",
-      "access_control": null,
-      "etag": "ee38fed3ca525582d32327a06f77c723",
       "created_by": null,
       "uploaded_by": null
     },
@@ -323,14 +291,14 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-24T01:06:13Z",
-    "last_updated_human": "2026-01-24 01:06:13 UTC",
-    "total_products": 10,
+    "last_updated": "2026-01-24T12:26:47Z",
+    "last_updated_human": "2026-01-24 12:26:47 UTC",
+    "total_products": 9,
     "source": "Cloudinary API",
     "update_type": "scheduled",
-    "update_id": "6510a511b9581f79",
-    "git_commit": "b602e20",
-    "workflow_run": "21306428549-1",
-    "generated_at": "1769216773"
+    "update_id": "b98bb0a8d6e5fb19",
+    "git_commit": "9836ea7",
+    "workflow_run": "21315072609-1",
+    "generated_at": "1769257607"
   }
 }
