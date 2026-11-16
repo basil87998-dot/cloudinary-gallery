@@ -1,6 +1,6 @@
 {
   "total_count": 75,
-  "time": 839,
+  "time": 139,
   "next_cursor": "b9bbbceb977b913840e604c56432e46b4d910fd1b1ed497fe87f0107e78b8e8c1d4cae106811677f1689ec1d40f4c73e",
   "resources": [
     {
@@ -965,14 +965,14 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-11-15T18:17:48Z",
-    "last_updated_human": "2026-11-15 18:17:48 UTC",
+    "last_updated": "2026-11-16T04:01:07Z",
+    "last_updated_human": "2026-11-16 04:01:07 UTC",
     "total_products": 30,
     "source": "Cloudinary API",
     "update_type": "scheduled",
-    "update_id": "4e292826ab08c78a",
-    "git_commit": "3170464",
-    "workflow_run": "43745933840-1",
-    "generated_at": "1794766668"
+    "update_id": "619a225da95b871e",
+    "git_commit": "d7a98d7",
+    "workflow_run": "43801502785-1",
+    "generated_at": "1794801667"
   }
 }
